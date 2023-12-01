@@ -1,24 +1,66 @@
-use nom::{
-    character::complete::{alpha0, line_ending, satisfy},
-    combinator::opt,
-    error::Error,
-    multi::many1,
-    sequence::{delimited, terminated},
-};
+#![warn(clippy::pedantic)]
+#![warn(clippy::style)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::missing_panics_doc)]
+#![warn(clippy::use_self)]
 
-pub fn solve(input: &str) -> u32 {
-    let line = terminated(
-        many1(delimited(alpha0, satisfy(|c| c.is_numeric()), alpha0)),
-        opt(line_ending),
-    );
+#[must_use]
+pub fn solve_a(input: &str) -> u32 {
+    let lines: Vec<_> = input
+        .lines()
+        .map(|l| {
+            l.chars()
+                .filter(|c| c.is_numeric())
+                .map(|c| c.to_digit(10).unwrap())
+                .collect()
+        })
+        .collect();
 
-    let (_, lines) = many1::<_, _, Error<_>, _>(line)(input).unwrap();
+    sum(&lines)
+}
 
+#[must_use]
+pub fn solve_b(input: &str) -> u32 {
+    let lines: Vec<_> = input
+        .lines()
+        .map(|l| {
+            let mut number = vec![];
+            for i in 0..l.len() {
+                if l[i..].starts_with("one") {
+                    number.push(1);
+                } else if l[i..].starts_with("two") {
+                    number.push(2);
+                } else if l[i..].starts_with("three") {
+                    number.push(3);
+                } else if l[i..].starts_with("four") {
+                    number.push(4);
+                } else if l[i..].starts_with("five") {
+                    number.push(5);
+                } else if l[i..].starts_with("six") {
+                    number.push(6);
+                } else if l[i..].starts_with("seven") {
+                    number.push(7);
+                } else if l[i..].starts_with("eight") {
+                    number.push(8);
+                } else if l[i..].starts_with("nine") {
+                    number.push(9);
+                } else if l[i..].chars().next().unwrap().is_numeric() {
+                    number.push(l[i..].chars().next().unwrap().to_digit(10).unwrap());
+                }
+            }
+            number
+        })
+        .collect();
+
+    sum(&lines)
+}
+
+fn sum(lines: &[Vec<u32>]) -> u32 {
     lines
         .iter()
         .map(|l| {
-            let first = l.first().unwrap().to_digit(10).unwrap();
-            let last = l.last().unwrap().to_digit(10).unwrap();
+            let first = *l.first().unwrap();
+            let last = *l.last().unwrap();
 
             assert!(first < 10);
             assert!(last < 10);
@@ -33,14 +75,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn example() {
+    fn example_a() {
         let input = "1abc2
 pqr3stu8vwx
 a1b2c3d4e5f
 treb7uchet
 ";
 
-        assert_eq!(solve(input), 142);
+        assert_eq!(solve_a(input), 142);
+    }
+
+    #[test]
+    fn example_b() {
+        let input = "two1nine
+eightwothree
+abcone2threexyz
+xtwone3four
+4nineeightseven2
+zoneight234
+7pqrstsixteen";
+
+        assert_eq!(solve_b(input), 281);
     }
 
     #[test]
@@ -48,6 +103,14 @@ treb7uchet
         let input = "371
 ";
 
-        assert_eq!(solve(input), 31);
+        assert_eq!(solve_a(input), 31);
+    }
+
+    #[test]
+    fn overlapping() {
+        let input = "1tbbsmdhtwonedtt
+";
+
+        assert_eq!(solve_b(input), 11);
     }
 }

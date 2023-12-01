@@ -1,5 +1,5 @@
-use day01::solve;
+use day01::solve_a;
 
 fn main() {
-    println!("{}", solve(include_str!("input-a.txt")))
+    println!("{}", solve_a(include_str!("input.txt")))
 }
