@@ -6,68 +6,56 @@
 
 #[must_use]
 pub fn solve_a(input: &str) -> u32 {
-    let lines: Vec<_> = input
+    let lines = input
         .lines()
-        .map(|l| {
-            l.chars()
-                .filter(|c| c.is_numeric())
-                .map(|c| c.to_digit(10).unwrap())
-                .collect()
-        })
-        .collect();
+        .map(|l| l.chars().filter_map(|c| c.to_digit(10)).collect());
 
-    sum(&lines)
+    sum(lines)
 }
 
 #[must_use]
 pub fn solve_b(input: &str) -> u32 {
-    let lines: Vec<_> = input
-        .lines()
-        .map(|l| {
-            let mut number = vec![];
-            for i in 0..l.len() {
-                if l[i..].starts_with("one") {
-                    number.push(1);
-                } else if l[i..].starts_with("two") {
-                    number.push(2);
-                } else if l[i..].starts_with("three") {
-                    number.push(3);
-                } else if l[i..].starts_with("four") {
-                    number.push(4);
-                } else if l[i..].starts_with("five") {
-                    number.push(5);
-                } else if l[i..].starts_with("six") {
-                    number.push(6);
-                } else if l[i..].starts_with("seven") {
-                    number.push(7);
-                } else if l[i..].starts_with("eight") {
-                    number.push(8);
-                } else if l[i..].starts_with("nine") {
-                    number.push(9);
-                } else if l[i..].chars().next().unwrap().is_numeric() {
-                    number.push(l[i..].chars().next().unwrap().to_digit(10).unwrap());
-                }
-            }
-            number
-        })
-        .collect();
+    let lines = input.lines().map(|line| {
+        let mut number = vec![];
+        for i in 0..line.len() {
+            let sub_slice = &line[i..];
 
-    sum(&lines)
+            if sub_slice.starts_with("one") {
+                number.push(1);
+            } else if sub_slice.starts_with("two") {
+                number.push(2);
+            } else if sub_slice.starts_with("three") {
+                number.push(3);
+            } else if sub_slice.starts_with("four") {
+                number.push(4);
+            } else if sub_slice.starts_with("five") {
+                number.push(5);
+            } else if sub_slice.starts_with("six") {
+                number.push(6);
+            } else if sub_slice.starts_with("seven") {
+                number.push(7);
+            } else if sub_slice.starts_with("eight") {
+                number.push(8);
+            } else if sub_slice.starts_with("nine") {
+                number.push(9);
+            } else if sub_slice.chars().next().unwrap().is_numeric() {
+                number.push(sub_slice.chars().next().unwrap().to_digit(10).unwrap());
+            }
+        }
+        number
+    });
+
+    sum(lines)
 }
 
-fn sum(lines: &[Vec<u32>]) -> u32 {
+fn sum(lines: impl Iterator<Item = Vec<u32>>) -> u32 {
     lines
-        .iter()
         .map(|l| {
             let first = *l.first().unwrap();
             let last = *l.last().unwrap();
-
-            assert!(first < 10);
-            assert!(last < 10);
-
             first * 10 + last
         })
-        .sum::<u32>()
+        .sum()
 }
 
 #[cfg(test)]
@@ -112,5 +100,15 @@ zoneight234
 ";
 
         assert_eq!(solve_b(input), 11);
+    }
+
+    #[test]
+    fn a() {
+        assert_eq!(solve_a(include_str!("input.txt")), 56397);
+    }
+
+    #[test]
+    fn b() {
+        assert_eq!(solve_b(include_str!("input.txt")), 55701);
     }
 }
