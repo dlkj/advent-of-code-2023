@@ -103,12 +103,12 @@ zoneight234
     }
 
     #[test]
-    fn a() {
+    fn solution_a() {
         assert_eq!(solve_a(include_str!("input.txt")), 56397);
     }
 
     #[test]
-    fn b() {
+    fn solution_b() {
         assert_eq!(solve_b(include_str!("input.txt")), 55701);
     }
 }

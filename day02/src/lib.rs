@@ -126,12 +126,12 @@ Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
     }
 
     #[test]
-    fn a() {
+    fn solution_a() {
         assert_eq!(solve_a(include_str!("input.txt")), 2101);
     }
 
     #[test]
-    fn b() {
+    fn solution_b() {
         assert_eq!(solve_b(include_str!("input.txt")), 58269);
     }
 }

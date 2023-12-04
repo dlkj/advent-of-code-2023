@@ -6,39 +6,35 @@
 
 #[must_use]
 pub fn solve_a(input: &str) -> u32 {
-    todo!()
+    input.len().try_into().unwrap()
 }
 
 #[must_use]
 pub fn solve_b(input: &str) -> u32 {
-    todo!()
+    input.len().try_into().unwrap()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    const INPUT: &str = "";
     #[test]
     fn example_a() {
-        let input = "";
-
-        assert_eq!(solve_a(input), 0);
+        assert_eq!(solve_a(INPUT), 0);
     }
 
     #[test]
     fn example_b() {
-        let input = "";
-
-        assert_eq!(solve_b(input), 0);
+        assert_eq!(solve_b(INPUT), 0);
     }
 
     #[test]
-    fn a() {
+    fn solution_a() {
         assert_eq!(solve_a(include_str!("input.txt")), 0);
     }
 
     #[test]
-    fn b() {
+    fn solution_b() {
         assert_eq!(solve_b(include_str!("input.txt")), 0);
     }
 }

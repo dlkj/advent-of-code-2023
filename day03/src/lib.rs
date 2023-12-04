@@ -161,12 +161,12 @@ mod tests {
     }
 
     #[test]
-    fn a() {
+    fn solution_a() {
         assert_eq!(solve_a(include_str!("input.txt")), 554_003);
     }
 
     #[test]
-    fn b() {
+    fn solution_b() {
         assert_eq!(solve_b(include_str!("input.txt")), 87_263_515);
     }
 }
