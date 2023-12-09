@@ -6,6 +6,7 @@
 
 use std::collections::HashMap;
 
+use num::Integer;
 use winnow::ascii::line_ending;
 use winnow::combinator::delimited;
 use winnow::combinator::preceded;
@@ -22,9 +23,9 @@ enum Step {
     Right,
 }
 
-fn parse_input<'a>(
-    input: &mut &'a str,
-) -> PResult<(Vec<Step>, Vec<(&'a str, (&'a str, &'a str))>)> {
+type Element<'a> = (&'a str, (&'a str, &'a str));
+
+fn parse_input<'a>(input: &mut &'a str) -> PResult<(Vec<Step>, Vec<Element<'a>>)> {
     separated_pair(
         repeat(
             1..,
@@ -53,12 +54,31 @@ pub fn solve_a(input: &str) -> u32 {
 
     let elements: HashMap<_, _> = elements.into_iter().collect();
 
-    let mut steps = steps.into_iter().cycle();
+    find_distance("AAA", &elements, &steps)
+}
 
-    let mut current = "AAA";
+#[must_use]
+pub fn solve_b(input: &str) -> u64 {
+    let (steps, elements) = parse_input.parse(input).unwrap();
+    let elements: HashMap<_, _> = elements.into_iter().collect();
+
+    elements
+        .keys()
+        .filter(|e| e.ends_with('A'))
+        .map(|p| u64::from(find_distance(p, &elements, &steps)))
+        .reduce(|a, b| a.lcm(&b))
+        .unwrap()
+}
+
+fn find_distance<'a>(
+    mut current: &'a str,
+    elements: &HashMap<&'a str, (&'a str, &'a str)>,
+    steps: &[Step],
+) -> u32 {
+    let mut steps = steps.iter().cycle();
     let mut count = 0;
 
-    while current != "ZZZ" {
+    while !current.ends_with('Z') {
         let (l, r) = elements.get(current).unwrap();
         match steps.next().unwrap() {
             Step::Left => current = l,
@@ -70,27 +90,34 @@ pub fn solve_a(input: &str) -> u32 {
     count
 }
 
-#[must_use]
-pub fn solve_b(input: &str) -> u32 {
-    input.len().try_into().unwrap()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    const INPUT: &str = "LLR
+    const INPUT_A: &str = "LLR
 
 AAA = (BBB, BBB)
 BBB = (AAA, ZZZ)
 ZZZ = (ZZZ, ZZZ)";
+
+    const INPUT_B: &str = "LR
+
+11A = (11B, XXX)
+11B = (XXX, 11Z)
+11Z = (11B, XXX)
+22A = (22B, XXX)
+22B = (22C, 22C)
+22C = (22Z, 22Z)
+22Z = (22B, 22B)
+XXX = (XXX, XXX)";
+
     #[test]
     fn example_a() {
-        assert_eq!(solve_a(INPUT), 6);
+        assert_eq!(solve_a(INPUT_A), 6);
     }
 
     #[test]
     fn example_b() {
-        assert_eq!(solve_b(INPUT), 0);
+        assert_eq!(solve_b(INPUT_B), 6);
     }
 
     #[test]
@@ -100,6 +127,6 @@ ZZZ = (ZZZ, ZZZ)";
 
     #[test]
     fn solution_b() {
-        assert_eq!(solve_b(include_str!("input.txt")), 0);
+        assert_eq!(solve_b(include_str!("input.txt")), 15_746_133_679_061);
     }
 }
