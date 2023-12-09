@@ -5,6 +5,8 @@
 #![warn(clippy::use_self)]
 
 use std::collections::HashMap;
+use std::fmt::Debug;
+use std::hash::Hash;
 
 use itertools::Itertools;
 use winnow::ascii::dec_uint;
@@ -16,26 +18,9 @@ use winnow::token::take_while;
 use winnow::PResult;
 use winnow::Parser;
 
-fn parse_hands(input: &mut &str) -> PResult<Vec<([Card; 5], u32)>> {
-    separated(
-        1..,
-        separated_pair(
-            take_while(5..=5, char::is_alphanum).map(|s: &str| {
-                s.chars()
-                    .map(|c| c.try_into().unwrap())
-                    .collect_vec()
-                    .try_into()
-                    .unwrap()
-            }),
-            ' ',
-            dec_uint,
-        ),
-        line_ending,
-    )
-    .parse_next(input)
-}
-
-fn parse_hands_j(input: &mut &str) -> PResult<Vec<([CardJ; 5], u32)>> {
+fn parse_hands<C: TryFrom<char, Error = impl Debug> + Debug>(
+    input: &mut &str,
+) -> PResult<Vec<([C; 5], u32)>> {
     separated(
         1..,
         separated_pair(
@@ -158,28 +143,22 @@ pub fn solve_a(input: &str) -> u32 {
         .map(|(cards, points)| (hand_type(*cards), cards, points))
         .collect_vec();
 
-    types
-        .iter()
-        .sorted_by(|(h0, cards0, _), (h1, cards1, _)| match h0.cmp(h1) {
-            std::cmp::Ordering::Less => std::cmp::Ordering::Less,
-            std::cmp::Ordering::Greater => std::cmp::Ordering::Greater,
-            std::cmp::Ordering::Equal => cards0.cmp(cards1),
-        })
-        .enumerate()
-        .fold(0, |score, (i, (_, _, &points))| {
-            score + ((u32::try_from(i).unwrap() + 1) * points)
-        })
+    sort_and_score(&types)
 }
 
 #[must_use]
 pub fn solve_b(input: &str) -> u32 {
-    let hands = parse_hands_j.parse(input).unwrap();
+    let hands = parse_hands.parse(input).unwrap();
 
     let types = hands
         .iter()
         .map(|(cards, points)| (hand_type_j(*cards), cards, points))
         .collect_vec();
 
+    sort_and_score(&types)
+}
+
+fn sort_and_score<C: Ord>(types: &[(HandType, &[C; 5], &u32)]) -> u32 {
     types
         .iter()
         .sorted_by(|(h0, cards0, _), (h1, cards1, _)| match h0.cmp(h1) {
@@ -194,31 +173,14 @@ pub fn solve_b(input: &str) -> u32 {
 }
 
 fn hand_type(cards: [Card; 5]) -> HandType {
-    let unique = cards.iter().unique().count();
-    match unique {
-        1 => HandType::Five,
-        2 => {
-            if let Some(1) = frequencies(cards).next() {
-                HandType::Four
-            } else {
-                HandType::FullHouse
-            }
-        } // aaaab Four, aaabb three
-        3 => {
-            if let Some(3) = frequencies(cards).nth(2) {
-                HandType::Three
-            } else {
-                HandType::TwoPair
-            }
-        } // aaabc three, aabbc two pair
-        4 => HandType::OnePair, // aabcd one pair
-        5 => HandType::High,    // high card
-        _ => unreachable!(),
-    }
+    let hist = frequencies(cards);
+    hand_type_from_hist(&hist)
 }
 
 fn hand_type_j(cards: [CardJ; 5]) -> HandType {
-    let mut hist = frequencies_j(cards);
+    let mut hist = frequencies(cards);
+
+    // redistribute jokers to most common other card
 
     if hist.len() == 1 {
         return HandType::Five;
@@ -228,17 +190,34 @@ fn hand_type_j(cards: [CardJ; 5]) -> HandType {
     let (_, largest) = hist.iter_mut().sorted_by_key(|(_, c)| **c).last().unwrap();
     *largest += j_count;
 
-    match hist.len() {
+    hand_type_from_hist(&hist)
+}
+
+fn frequencies<C: Ord + Copy + Hash>(cards: [C; 5]) -> HashMap<C, usize> {
+    cards
+        .iter()
+        .sorted()
+        .copied()
+        .group_by(|&x| x)
+        .into_iter()
+        .map(|(c, g)| (c, g.count()))
+        .collect()
+}
+
+fn hand_type_from_hist<C>(hist: &HashMap<C, usize>) -> HandType {
+    let freq = hist.values().sorted().collect_vec();
+
+    match freq.len() {
         1 => HandType::Five,
         2 => {
-            if let Some(1) = hist.values().sorted().next() {
+            if let Some(1) = freq.first() {
                 HandType::Four
             } else {
                 HandType::FullHouse
             }
         } // aaaab Four, aaabb three
         3 => {
-            if let Some(3) = hist.values().sorted().nth(2) {
+            if let Some(3) = freq.get(2) {
                 HandType::Three
             } else {
                 HandType::TwoPair
@@ -248,28 +227,6 @@ fn hand_type_j(cards: [CardJ; 5]) -> HandType {
         5 => HandType::High,    // high card
         _ => unreachable!(),
     }
-}
-
-fn frequencies(cards: [Card; 5]) -> impl Iterator<Item = usize> {
-    cards
-        .iter()
-        .sorted()
-        .copied()
-        .group_by(|&x| x)
-        .into_iter()
-        .map(|(_, g)| g.count())
-        .sorted()
-}
-
-fn frequencies_j(cards: [CardJ; 5]) -> HashMap<CardJ, usize> {
-    cards
-        .iter()
-        .sorted()
-        .copied()
-        .group_by(|&x| x)
-        .into_iter()
-        .map(|(c, g)| (c, g.count()))
-        .collect()
 }
 
 #[cfg(test)]
@@ -298,7 +255,7 @@ QQQJA 483";
 
     #[test]
     fn solution_b() {
-        assert_eq!(solve_b(include_str!("input.txt")), 0);
+        assert_eq!(solve_b(include_str!("input.txt")), 252_113_488);
     }
 
     fn to_cards(input: &str) -> [Card; 5] {
