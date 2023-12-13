@@ -7,5 +7,4 @@ edition = "2021"
 
 [dependencies]
 itertools = "0.12.0"
-rayon = "1.8.0"
 winnow = "0.5.26"

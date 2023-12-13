@@ -4,9 +4,7 @@
 #![allow(clippy::missing_panics_doc)]
 #![warn(clippy::use_self)]
 
-use itertools::{repeat_n, Itertools};
-use rayon::iter::IntoParallelIterator;
-use rayon::iter::ParallelIterator;
+use itertools::Itertools;
 use winnow::{
     ascii::{dec_uint, line_ending},
     combinator::{alt, eof, repeat, separated, separated_pair, terminated},
@@ -34,64 +32,63 @@ fn group_parser<'a>(len: usize) -> impl Parser<&'a str, (), ErrMode<ContextError
     )
 }
 
-fn solve(lines: Vec<(String, Vec<u32>)>) -> u32 {
+fn solve(lines: Vec<(String, Vec<u32>)>) -> u64 {
     let mut result = 0;
-    let len = lines.len();
 
-    for (i, (record, groups)) in lines.into_iter().enumerate() {
-        let mut c = vec![(String::new(), &record[..], groups)];
-        println!("{i} of {len}");
+    for (record, groups) in lines {
+        let mut c = vec![(1, &record[..], &groups[..])];
 
         loop {
             c = c
-                .into_par_iter()
-                .flat_map(|(f, r, g)| possible_next(f, r, g))
+                .into_iter()
+                .flat_map(|(n, r, g)| possible_next(n, r, g))
                 .collect();
 
             result += c
                 .iter()
                 .filter(|(_, record, g)| record.is_empty() && g.is_empty())
-                .count();
+                .map(|&(x, _, _)| x)
+                .sum::<usize>();
 
             c = c
                 .into_iter()
                 .filter(|(_, record, g)| !record.is_empty() || !g.is_empty())
+                .sorted_by_key(|&(_, r, g)| (r, g))
+                .group_by(|&(_, r, g)| (r, g))
+                .into_iter()
+                .map(|((r, g), group)| {
+                    let n = group.into_iter().map(|(x, _, _)| x).sum();
+                    (n, r, g)
+                })
                 .collect_vec();
-
-            println!("{:?}", c.len());
-            // println!("{c:?}");
 
             if c.is_empty() {
                 break;
             }
         }
-
-        result += c.len();
     }
     result.try_into().unwrap()
 }
 
 fn possible_next<'a>(
-    mut filled_in: String,
+    count: usize,
     mut record: &'a str,
-    groups: Vec<u32>,
-) -> Vec<(String, &'a str, Vec<u32>)> {
+    groups: &'a [u32],
+) -> Vec<(usize, &'a str, &'a [u32])> {
     // consume any '.'s
-    let mut results = vec![];
     while let Some('.') = record.chars().next() {
-        filled_in.push('.');
         record = &record[1..];
     }
 
     if !groups.is_empty() && record.is_empty() {
-        return results;
+        return vec![];
     }
 
     if groups.is_empty() {
         if !record.contains('#') {
-            results.push((filled_in, "", vec![]));
+            return vec![(count, "", groups)];
         }
-        return results;
+        return vec![];
     }
 
     match record.chars().next() {
@@ -99,59 +96,43 @@ fn possible_next<'a>(
             if !groups.is_empty() {
                 let g = groups.first().copied().unwrap().try_into().unwrap();
                 if group_parser(g).parse_peek(record).is_ok() {
-                    let mut next_filled = filled_in.clone();
-                    next_filled.extend(repeat_n('#', g));
-                    next_filled.push('.');
-
                     let offset = record.len().min(g + 1);
-                    results.push((
-                        next_filled,
-                        &record[offset..],
-                        groups[1..].iter().copied().collect_vec(),
-                    ));
+                    return vec![
+                        (count, &record[offset..], &groups[1..]),
+                        (count, &record[1..], groups),
+                    ];
                 }
             }
-
-            let mut next_filled = filled_in.clone();
-            next_filled.push('.');
-            results.push((next_filled, &record[1..], groups));
+            return vec![(count, &record[1..], groups)];
         } // branch with '.' and check for possible '#'
         Some('#') => {
             if !groups.is_empty() {
                 let g = groups.first().copied().unwrap().try_into().unwrap();
                 if group_parser(g).parse_peek(record).is_ok() {
-                    let mut next_filled = filled_in.clone();
-                    next_filled.extend(repeat_n('#', g));
-                    next_filled.push('.');
-
                     let offset = record.len().min(g + 1);
-                    results.push((
-                        next_filled,
-                        &record[offset..],
-                        groups[1..].iter().copied().collect_vec(),
-                    ));
+                    return vec![(count, &record[offset..], &groups[1..])];
                 }
             }
         } // verify the next group can be written then advance
         None => {
             if groups.is_empty() {
-                results.push((filled_in, record, groups));
+                return vec![(count, record, groups)];
             }
         }
         Some(c) => panic!("Unexpected char {c}"),
     }
-    results
+    vec![]
 }
 
 #[must_use]
-pub fn solve_a(input: &str) -> u32 {
+pub fn solve_a(input: &str) -> u64 {
     let lines = parse_lines.parse(input).unwrap();
     let lines = lines.into_iter().map(|(r, g)| (r.to_owned(), g)).collect();
     solve(lines)
 }
 
 #[must_use]
-pub fn solve_b(input: &str) -> u32 {
+pub fn solve_b(input: &str) -> u64 {
     let lines = parse_lines.parse(input).unwrap();
     let lines = lines
         .into_iter()
@@ -191,10 +172,7 @@ mod tests {
 
     #[test]
     fn eof() {
-        assert_eq!(
-            possible_next("#.#.".to_owned(), "###", vec![3]),
-            vec![("#.#.###.".to_string(), "", vec![])]
-        );
+        assert_eq!(possible_next(1, "###", &[3]), vec![(1, "", &[][..])]);
     }
 
     #[test]
@@ -212,8 +190,8 @@ mod tests {
         assert_eq!(solve_a(include_str!("input.txt")), 6935);
     }
 
-    // #[test]
-    // fn solution_b() {
-    //     assert_eq!(solve_b(include_str!("input.txt")), 0);
-    // }
+    #[test]
+    fn solution_b() {
+        assert_eq!(solve_b(include_str!("input.txt")), 3_920_437_278_260);
+    }
 }
