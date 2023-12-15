@@ -9,7 +9,7 @@ use std::ops::Range;
 use itertools::Itertools;
 use winnow::{
     ascii::{dec_uint, line_ending},
-    combinator::{preceded, repeat, separated, VerifyMap},
+    combinator::{preceded, repeat, separated},
     token::take_until1,
     PResult, Parser,
 };
@@ -62,9 +62,12 @@ pub fn solve_b(mut input: &str) -> u64 {
         .tuples()
         .map(|(a, b)| a..(a + b))
         .collect_vec();
+
     let location_maps: Vec<Vec<_>> = repeat(1.., parse_map).parse(parse_input).unwrap();
 
-    map_seed_range(&seeds, &location_maps)
+    println!("{seeds:?}");
+
+    map_seed_range(seeds, &location_maps)
         .into_iter()
         .map(|r| r.start)
         .min()
@@ -85,53 +88,73 @@ fn map_seed(mut seed: u64, location_maps: &[Vec<(u64, Range<u64>)>]) -> u64 {
 }
 
 fn map_seed_range(
-    seeds: &[Range<u64>],
+    mut seeds: Vec<Range<u64>>,
     location_maps: &[Vec<(u64, Range<u64>)>],
 ) -> Vec<Range<u64>> {
-    let mut seeds: Vec<Range<u64>> = seeds.into_iter().cloned().collect();
-
     for map_list in location_maps {
         let mut processed = vec![];
-        for (dest, source) in map_list {
-            let mut missed = vec![];
-            for s in &seeds {
-                let (m, hit) = intersect(s, source);
+
+        while let Some(seed) = seeds.pop() {
+            let mut any_hit = false;
+            for (dest, source) in map_list {
+                let (misses, hit) = intersect(&seed, source, *dest);
+
                 if let Some(hit) = hit {
                     processed.push(hit);
-                    missed.extend(m);
+                    seeds.extend(misses);
+                    any_hit = true;
+                    break;
                 }
             }
-            seeds.extend(missed);
+            if !any_hit {
+                processed.push(seed);
+            }
         }
+
         seeds = processed;
     }
+
     seeds
 }
 
-fn intersect(s: &Range<u64>, source: &Range<u64>) -> (Vec<Range<u64>>, Option<Range<u64>>) {
+fn intersect(
+    seed: &Range<u64>,
+    source: &Range<u64>,
+    dest: u64,
+) -> (Vec<Range<u64>>, Option<Range<u64>>) {
     // no intersection
-    if s.end <= source.start || s.start >= source.end {
-        return (vec![s.clone()], None);
+    if seed.end <= source.start || seed.start >= source.end {
+        return (vec![seed.clone()], None);
     }
 
     // bisect
-    if s.start < source.start && s.end > source.end {
+    if seed.start < source.start && seed.end > source.end {
         return (
-            vec![s.start..source.start, source.end..s.end],
-            Some(source.clone()),
+            vec![seed.start..source.start, source.end..seed.end],
+            Some((dest)..(dest + source.end - source.start)),
         );
     }
 
     // single overlap greater
-    if s.start < source.start && s.end <= source.end {
-        return (vec![s.start..source.start], Some(source.start..s.end));
+    if seed.start < source.start && seed.end <= source.end {
+        return (
+            vec![seed.start..source.start],
+            Some((dest)..(seed.end - source.start + dest)),
+        );
     }
     // single overlap less
-    if s.start >= source.start && s.end > source.end {
-        return (vec![source.end..s.end], Some(s.start..source.end));
+    if seed.start >= source.start && seed.end > source.end {
+        return (
+            vec![source.end..seed.end],
+            Some((seed.start - source.start + dest)..(source.end - source.start + dest)),
+        );
     }
+
     // contained
-    return (vec![], Some(s.clone()));
+    (
+        vec![],
+        Some((seed.start - source.start + dest)..(seed.end - source.start + dest)),
+    )
 }
 
 #[cfg(test)]
@@ -187,6 +210,51 @@ humidity-to-location map:
 
     #[test]
     fn solution_b() {
-        assert_eq!(solve_b(include_str!("input.txt")), 0);
+        assert_eq!(solve_b(include_str!("input.txt")), 47_909_639);
+    }
+
+    #[test]
+    fn intersect_miss() {
+        assert_eq!(intersect(&(0..10), &(10..20), 100), (vec![0..10], None));
+    }
+
+    #[test]
+    fn intersect_match() {
+        assert_eq!(
+            intersect(&(10..20), &(10..20), 100),
+            (vec![], Some(100..110))
+        );
+    }
+
+    #[test]
+    fn intersect_bisect() {
+        assert_eq!(
+            intersect(&(0..30), &(10..20), 100),
+            (vec![0..10, 20..30], Some(100..110))
+        );
+    }
+
+    #[test]
+    fn intersect_inside() {
+        assert_eq!(
+            intersect(&(10..20), &(0..30), 100),
+            (vec![], Some(110..120))
+        );
+    }
+
+    #[test]
+    fn intersect_overlap_greater() {
+        assert_eq!(
+            intersect(&(0..20), &(10..30), 100),
+            (vec![0..10], Some(100..110))
+        );
+    }
+
+    #[test]
+    fn intersect_overlap_less() {
+        assert_eq!(
+            intersect(&(10..30), &(0..20), 100),
+            (vec![20..30], Some(110..120))
+        );
     }
 }
