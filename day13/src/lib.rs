@@ -4,17 +4,18 @@
 #![allow(clippy::missing_panics_doc)]
 #![warn(clippy::use_self)]
 
-use winnow::{
-    ascii::{line_ending, not_line_ending},
-    combinator::separated,
-    PResult, Parser,
-};
+use winnow::{ascii::line_ending, combinator::separated, token::take_while, PResult, Parser};
 
-fn parse_map<'a>(input: &mut &'a str) -> PResult<Vec<&'a str>> {
-    separated(1.., not_line_ending, line_ending).parse_next(input)
+fn parse_map(input: &mut &str) -> PResult<Vec<String>> {
+    separated(
+        1..,
+        take_while(1.., |c: char| !c.is_whitespace()).map(&str::to_owned),
+        line_ending,
+    )
+    .parse_next(input)
 }
 
-fn parse_maps<'a>(input: &mut &'a str) -> PResult<Vec<Vec<&'a str>>> {
+fn parse_maps(input: &mut &str) -> PResult<Vec<Vec<String>>> {
     separated(1.., parse_map, (line_ending, line_ending)).parse_next(input)
 }
 
@@ -22,35 +23,55 @@ fn parse_maps<'a>(input: &mut &'a str) -> PResult<Vec<Vec<&'a str>>> {
 pub fn solve_a(input: &str) -> usize {
     let maps = parse_maps.parse(input).unwrap();
 
-    for m in maps {
-        if let Some(value) = find_mirror_y(&m) {
-            return value;
-        }
+    maps.into_iter()
+        .map(|m| {
+            if let Some(value) = find_mirror_rows(&m) {
+                return (value + 1) * 100;
+            }
 
-        // transpose and try again
-    }
+            // transpose
+            let mut transpose: Vec<String> = vec![];
+            for s in &m {
+                for (x, c) in s.chars().enumerate() {
+                    if let Some(s) = transpose.get_mut(x) {
+                        s.push(c);
+                    } else {
+                        transpose.push(c.to_string());
+                    }
+                }
+            }
 
-    input.len().try_into().unwrap()
+            // try again
+            if let Some(value) = find_mirror_rows(&transpose) {
+                return value + 1;
+            }
+            panic!("no mirror found for {m:?}")
+        })
+        .sum()
 }
 
-fn find_mirror_y(m: &[&str]) -> Option<usize> {
-    for i in 0..(m.len() - 1) {
-        //then check outwards
-        if m[i] == m[i + 1] {
-            return Some(i);
-        }
-    }
-    None
+fn find_mirror_rows(rows: &[String]) -> Option<usize> {
+    (0..(rows.len() - 1)).find(|&i| {
+        (0..=i).all(|j| {
+            let mirror_row = i * 2 - j + 1;
+            if let Some(right) = rows.get(mirror_row) {
+                right == &rows[j]
+            } else {
+                true
+            }
+        })
+    })
 }
 
 #[must_use]
 pub fn solve_b(input: &str) -> usize {
-    input.len().try_into().unwrap()
+    input.len()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
     const INPUT: &str = "#.##..##.
 ..#.##.#.
 ##......#
@@ -66,9 +87,10 @@ mod tests {
 #####.##.
 ..##..###
 #....#..#";
+
     #[test]
     fn example_a() {
-        assert_eq!(solve_a(INPUT), 0);
+        assert_eq!(solve_a(INPUT), 405);
     }
 
     #[test]
@@ -78,7 +100,7 @@ mod tests {
 
     #[test]
     fn solution_a() {
-        assert_eq!(solve_a(include_str!("input.txt")), 0);
+        assert_eq!(solve_a(include_str!("input.txt")), 37_561);
     }
 
     #[test]
